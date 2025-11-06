@@ -72,9 +72,13 @@ app.post('/create-listing', async (req, res) => {
       shipping_profile_id: parseInt(listingData.shipping_profile_id),
       quantity: parseInt(listingData.quantity),
       processing_min: parseInt(listingData.processing_min),
-      processing_max: parseInt(listingData.processing_max),
-      production_partner_ids: listingData.production_partner_ids.map(id => parseInt(id))
+      processing_max: parseInt(listingData.processing_max)
     };
+    
+    // Only process production_partner_ids if it exists
+    if (listingData.production_partner_ids) {
+      cleanData.production_partner_ids = listingData.production_partner_ids.map(id => parseInt(id));
+    }
     
     console.log('Sending to Etsy:', JSON.stringify(cleanData, null, 2));
     
