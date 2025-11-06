@@ -63,11 +63,26 @@ app.post('/create-listing', async (req, res) => {
 
   try {
     const listingData = req.body;
-    const shopId = listingData.shop_id;
+    
+    // Ensure numeric fields are numbers, not strings
+    const cleanData = {
+      ...listingData,
+      shop_id: parseInt(listingData.shop_id),
+      taxonomy_id: parseInt(listingData.taxonomy_id),
+      shipping_profile_id: parseInt(listingData.shipping_profile_id),
+      quantity: parseInt(listingData.quantity),
+      processing_min: parseInt(listingData.processing_min),
+      processing_max: parseInt(listingData.processing_max),
+      production_partner_ids: listingData.production_partner_ids.map(id => parseInt(id))
+    };
+    
+    console.log('Sending to Etsy:', JSON.stringify(cleanData, null, 2));
+    
+    const shopId = cleanData.shop_id;
     
     const response = await axios.post(
       `https://openapi.etsy.com/v3/application/shops/${shopId}/listings`,
-      listingData,
+      cleanData,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
