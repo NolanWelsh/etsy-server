@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const crypto = require('crypto');
 const app = express();
 app.use(express.json());
 
@@ -8,34 +9,49 @@ const ETSY_API_KEY = process.env.ETSY_API_KEY;
 const ETSY_API_SECRET = process.env.ETSY_API_SECRET;
 const CALLBACK_URL = process.env.CALLBACK_URL;
 
+// Generate consistent code verifier and challenge
+const CODE_VERIFIER = 'DSWlW2WxJHikSi5pfaNAie-tna7S78XX2eDQxm1yypQ'; // Use only ASCII characters
+const CODE_CHALLENGE = crypto.createHash('sha256').update(CODE_VERIFIER).digest('base64')
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
 let accessToken = null;
 let refreshToken = null;
 
 // Start OAuth flow
 app.get('/auth', (req, res) => {
-  const authUrl = `https://www.etsy.com/oauth/connect?response_type=code&redirect_uri=${encodeURIComponent(CALLBACK_URL)}&scope=listings_w%20listings_r&client_id=${ETSY_API_KEY}&state=superstate&code_challenge=DSWlW2WxJHikSi5pfaNAie-տնա7S78XX2eDQxm1yypQ&code_challenge_method=S256`;
+  const authUrl = `https://www.etsy.com/oauth/connect?response_type=code&redirect_uri=${encodeURIComponent(CALLBACK_URL)}&scope=listings_w%20listings_r&client_id=${ETSY_API_KEY}&state=superstate&code_challenge=${CODE_CHALLENGE}&code_challenge_method=S256`;
   console.log('Auth URL:', authUrl);
+  console.log('Code Challenge:', CODE_CHALLENGE);
   res.redirect(authUrl);
 });
 
 // OAuth callback
 app.get('/callback', async (req, res) => {
   const code = req.query.code;
+  console.log('Received code:', code);
+  console.log('Using verifier:', CODE_VERIFIER);
+  
   try {
     const tokenResponse = await axios.post('https://api.etsy.com/v3/public/oauth/token', {
       grant_type: 'authorization_code',
       client_id: ETSY_API_KEY,
       redirect_uri: CALLBACK_URL,
       code: code,
-      code_verifier: 'DSWlW2WxJHikSi5pfaNAie-տնա7S78XX2eDQxm1yypQ'
+      code_verifier: CODE_VERIFIER
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
     
     accessToken = tokenResponse.data.access_token;
     refreshToken = tokenResponse.data.refresh_token;
     
+    console.log('✅ Authentication successful!');
     res.send('✅ Authentication successful! You can close this window.');
   } catch (error) {
-    res.status(500).send('Authentication failed: ' + error.message);
+    console.error('Authentication error:', error.response?.data || error.message);
+    res.status(500).send('Authentication failed: ' + JSON.stringify(error.response?.data || error.message));
   }
 });
 
@@ -49,7 +65,6 @@ app.post('/create-listing', async (req, res) => {
     const listingData = req.body;
     const shopId = listingData.shop_id;
     
-    // Create draft listing
     const response = await axios.post(
       `https://openapi.etsy.com/v3/application/shops/${shopId}/listings`,
       listingData,
@@ -64,13 +79,14 @@ app.post('/create-listing', async (req, res) => {
     
     res.json({ success: true, listing: response.data });
   } catch (error) {
+    console.error('Listing creation error:', error.response?.data || error.message);
     res.status(500).json({ error: error.response?.data || error.message });
   }
 });
 
 // Health check
 app.get('/', (req, res) => {
-  res.send('Etsy Automation Server Running');
+  res.send('Etsy Server Running');
 });
 
 app.listen(PORT, () => {
