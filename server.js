@@ -103,32 +103,6 @@ app.post('/create-listing', async (req, res) => {
   }
 });
 
-// Update inventory (simple proxy for n8n)
-app.post('/update-inventory', async (req, res) => {
-  if (!accessToken) {
-    return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
-  }
-  try {
-    const { listing_id, products } = req.body; // expect these from n8n
-    const r = await axios.put(
-      `https://openapi.etsy.com/v3/application/listings/${listing_id}/inventory`,
-      { products },
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`, // <-- use live in-memory token
-          'x-api-key': ETSY_API_KEY,
-          'Content-Type': 'application/json',
-        }
-      }
-    );
-    res.status(200).json(r.data);
-  } catch (e) {
-    console.error('Inventory update error:', e.response?.data || e.message);
-    res.status(e.response?.status || 500).json(e.response?.data || { error: e.message });
-  }
-});
-
-
 // Get shipping profiles
 app.get('/get-shipping-profiles', async (req, res) => {
   if (!accessToken) {
