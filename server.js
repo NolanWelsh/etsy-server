@@ -181,6 +181,43 @@ app.get('/get-listing/:listing_id', async (req, res) => {
   }
 });
 
+// Update inventory for a listing (n8n -> this route -> Etsy)
+app.post('/update-inventory', async (req, res) => {
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
+  }
+
+  try {
+    const { listing_id, products } = req.body;
+    if (!listing_id || !Array.isArray(products)) {
+      return res.status(400).json({ error: 'listing_id and products[] are required' });
+    }
+
+    const payload = {
+      products,
+      price_on_property: false, // you’re sending price in offerings
+      sku_on_property: false    // you’re sending sku on product
+    };
+
+    const r = await axios.put(
+      `https://openapi.etsy.com/v3/application/listings/${listing_id}/inventory`,
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': ETSY_API_KEY,
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+
+    res.json(r.data);
+  } catch (error) {
+    console.error('Inventory update error:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ error: error.response?.data || error.message });
+  }
+});
+
 // Health check
 app.get('/', (req, res) => {
   res.send('Etsy Server Running');
