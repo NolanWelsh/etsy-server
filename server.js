@@ -103,6 +103,27 @@ app.post('/create-listing', async (req, res) => {
   }
 });
 
+// PUT /etsy/listings/:listing_id/inventory  -> forwards to Etsy v3
+app.put('/etsy/listings/:listing_id/inventory', async (req, res) => {
+  try {
+    const { listing_id } = req.params;
+    const r = await fetch(`https://openapi.etsy.com/v3/application/listings/${listing_id}/inventory`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ETSY_API_KEY,
+        'Authorization': `Bearer ${process.env.ETSY_ACCESS_TOKEN}`,
+      },
+      body: JSON.stringify(req.body),
+    });
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (e) {
+    res.status(500).json({ error: { error: e.message } });
+  }
+});
+
+
 // Get shipping profiles
 app.get('/get-shipping-profiles', async (req, res) => {
   if (!accessToken) {
