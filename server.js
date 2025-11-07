@@ -19,7 +19,7 @@ let refreshToken = null;
 
 // Start OAuth flow
 app.get('/auth', (req, res) => {
-  const authUrl = `https://www.etsy.com/oauth/connect?response_type=code&redirect_uri=${encodeURIComponent(CALLBACK_URL)}&scope=listings_w%20listings_r&client_id=${ETSY_API_KEY}&state=superstate&code_challenge=${CODE_CHALLENGE}&code_challenge_method=S256`;
+  const authUrl = `https://www.etsy.com/oauth/connect?response_type=code&redirect_uri=${encodeURIComponent(CALLBACK_URL)}&scope=listings_w%20listings_r%20shops_r&client_id=${ETSY_API_KEY}&state=superstate&code_challenge=${CODE_CHALLENGE}&code_challenge_method=S256`;
   console.log('Auth URL:', authUrl);
   console.log('Code Challenge:', CODE_CHALLENGE);
   res.redirect(authUrl);
