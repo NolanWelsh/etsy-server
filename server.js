@@ -103,23 +103,28 @@ app.post('/create-listing', async (req, res) => {
   }
 });
 
-// PUT /etsy/listings/:listing_id/inventory  -> forwards to Etsy v3
-app.put('/etsy/listings/:listing_id/inventory', async (req, res) => {
+// Update inventory (simple proxy for n8n)
+app.post('/update-inventory', async (req, res) => {
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
+  }
   try {
-    const { listing_id } = req.params;
-    const r = await fetch(`https://openapi.etsy.com/v3/application/listings/${listing_id}/inventory`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ETSY_API_KEY,
-        'Authorization': `Bearer ${process.env.ETSY_ACCESS_TOKEN}`,
-      },
-      body: JSON.stringify(req.body),
-    });
-    const data = await r.json();
-    res.status(r.status).json(data);
+    const { listing_id, products } = req.body; // expect these from n8n
+    const r = await axios.put(
+      `https://openapi.etsy.com/v3/application/listings/${listing_id}/inventory`,
+      { products },
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`, // <-- use live in-memory token
+          'x-api-key': ETSY_API_KEY,
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+    res.status(200).json(r.data);
   } catch (e) {
-    res.status(500).json({ error: { error: e.message } });
+    console.error('Inventory update error:', e.response?.data || e.message);
+    res.status(e.response?.status || 500).json(e.response?.data || { error: e.message });
   }
 });
 
