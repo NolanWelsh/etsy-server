@@ -155,6 +155,32 @@ app.get('/get-production-partners', async (req, res) => {
   }
 });
 
+// Get listing details
+app.get('/get-listing/:listing_id', async (req, res) => {
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
+  }
+
+  try {
+    const listingId = req.params.listing_id;
+    
+    const response = await axios.get(
+      `https://openapi.etsy.com/v3/application/listings/${listingId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': ETSY_API_KEY
+        }
+      }
+    );
+    
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error:', error.response?.data || error.message);
+    res.status(500).json({ error: error.response?.data || error.message });
+  }
+});
+
 // Health check
 app.get('/', (req, res) => {
   res.send('Etsy Server Running');
