@@ -187,43 +187,44 @@ app.post('/update-inventory', async (req, res) => {
   }
 
   try {
-    // Accept data from n8n
-    const { listing_id, products } = req.body;
 
-    // Validate incoming data
-    if (!listing_id || !Array.isArray(products) || products.length === 0) {
-      console.log('❌ Invalid request body:', req.body);
+    // Update inventory for a listing (n8n -> this route -> Etsy)
+app.post('/update-inventory', async (req, res) => {
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
+  }
+
+  try {
+    const { listing_id, products } = req.body;
+    if (!listing_id || !Array.isArray(products)) {
       return res.status(400).json({ error: 'listing_id and products[] are required' });
     }
 
-    // Etsy-compatible payload (💡 this is still the same as before!)
     const payload = {
       products,
-      price_on_property: [513],
-      quantity_on_property: [],
-      sku_on_property: []
+      price_on_property: [513], // Price varies by Frame (property_id 513)
+      quantity_on_property: [], // Quantity doesn't vary
+      sku_on_property: []       // SKU doesn't vary (all use same file_id)
     };
 
-    console.log('✅ Updating inventory for listing:', listing_id);
-    console.log('✅ Payload being sent to Etsy:', JSON.stringify(payload, null, 2));
+    console.log('Updating inventory for listing:', listing_id);
+    console.log('Payload:', JSON.stringify(payload, null, 2));
 
-    // Send to Etsy
-    const response = await axios.put(
+    const r = await axios.put(
       `https://openapi.etsy.com/v3/application/listings/${listing_id}/inventory`,
       payload,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'x-api-key': ETSY_API_KEY,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         }
       }
     );
 
-    // Return success to n8n
-    res.json({ success: true, inventory: response.data });
+    res.json({ success: true, inventory: r.data });
   } catch (error) {
-    console.error('❌ Inventory update error:', error.response?.data || error.message);
+    console.error('Inventory update error:', error.response?.data || error.message);
     res.status(error.response?.status || 500).json({ error: error.response?.data || error.message });
   }
 });
