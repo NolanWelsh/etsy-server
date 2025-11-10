@@ -229,6 +229,56 @@ app.post('/update-inventory', async (req, res) => {
   }
 });
 
+// Add this to your routes/index.js file or wherever you define routes
+
+app.get('/get-size-property-id/:listingId', async (req, res) => {
+  try {
+    const { listingId } = req.params;
+    
+    // Use your existing access token setup
+    const accessToken = req.app.get('accessToken');
+    
+    const response = await fetch(
+      `https://openapi.etsy.com/v3/application/listings/${listingId}/inventory`, 
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': process.env.ETSY_API_KEY
+        }
+      }
+    );
+    
+    const data = await response.json();
+    
+    // Find the Size property ID
+    let sizePropertyId = null;
+    if (data.products && data.products.length > 0) {
+      for (const product of data.products) {
+        if (product.property_values) {
+          for (const prop of product.property_values) {
+            if (prop.property_name.toLowerCase().includes('size')) {
+              sizePropertyId = prop.property_id;
+              break;
+            }
+          }
+        }
+        if (sizePropertyId) break;
+      }
+    }
+    
+    res.json({ 
+      sizePropertyId, 
+      success: true 
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ 
+      error: error.message, 
+      success: false 
+    });
+  }
+});
+
 // Health check
 app.get('/', (req, res) => {
   res.send('Etsy Server Running');
