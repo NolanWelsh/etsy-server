@@ -250,35 +250,37 @@ app.get('/get-size-property-id/:listingId', async (req, res) => {
     
     const data = await response.json();
     
-    // Find the Size property ID
-    let sizePropertyId = null;
-    if (data.products && data.products.length > 0) {
-      for (const product of data.products) {
-        if (product.property_values) {
-          for (const prop of product.property_values) {
-            if (prop.property_name.toLowerCase().includes('size')) {
-              sizePropertyId = prop.property_id;
-              break;
-            }
-          }
-        }
-        if (sizePropertyId) break;
-      }
-    }
+   // Get property IDs from previous node
+const SIZE_PROPERTY_ID = $('Get Variation Properties').item.json.sizePropertyId;
+const PRINT_TYPE_PROPERTY_ID = $('Get Variation Properties').item.json.printTypePropertyId;
+
+// Build variations
+const products = [];
+for (const size of sizes) {
+  for (const printType of printTypes) {
+    // Your pricing logic here
     
-    res.json({ 
-      sizePropertyId, 
-      success: true 
-    });
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ 
-      error: error.message, 
-      success: false 
+    products.push({
+      sku: fileId,
+      property_values: [
+        { property_id: SIZE_PROPERTY_ID, property_name: "Size", values: [size] },
+        { property_id: PRINT_TYPE_PROPERTY_ID, property_name: "Print Type", values: [printType] }
+      ],
+      offerings: [
+        { price: finalPrice, quantity: 999, is_enabled: true, readiness_state_id: READINESS_STATE_ID }
+      ]
     });
   }
-});
+}
 
+return {
+  listing_id: listingId,
+  products: products,
+  price_on_property: [SIZE_PROPERTY_ID, PRINT_TYPE_PROPERTY_ID],
+  quantity_on_property: [],
+  sku_on_property: []
+};
+    
 // Health check
 app.get('/', (req, res) => {
   res.send('Etsy Server Running');
