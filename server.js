@@ -181,13 +181,6 @@ app.get('/get-listing/:listing_id', async (req, res) => {
   }
 });
 
-app.post('/update-inventory', async (req, res) => {
-  if (!accessToken) {
-    return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
-  }
-
-  try {
-
     // Update inventory for a listing (n8n -> this route -> Etsy)
 app.post('/update-inventory', async (req, res) => {
   if (!accessToken) {
