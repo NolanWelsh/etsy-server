@@ -229,79 +229,84 @@ app.post('/update-inventory', async (req, res) => {
   }
 });
 
-// Replace your existing get-size-property-id route with this enhanced version
+// Get Size + Print Type property IDs and current inventory state
 app.get('/get-size-property-id/:listingId', async (req, res) => {
   try {
     const { listingId } = req.params;
-    
-    // First, get the listing to find its taxonomy_id
-    const listingResponse = await fetch(
-      `https://openapi.etsy.com/v3/application/listings/${listingId}`, 
+
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
+    }
+
+    // 1) Get the listing details (so we know taxonomy_id)
+    const listingResponse = await axios.get(
+      `https://openapi.etsy.com/v3/application/listings/${listingId}`,
       {
         headers: {
-          'Authorization': `Bearer ${req.app.get('accessToken')}`,
-          'x-api-key': process.env.ETSY_API_KEY
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': ETSY_API_KEY
         }
       }
     );
-    
-    const listingData = await listingResponse.json();
+
+    const listingData = listingResponse.data;
     const taxonomyId = listingData.taxonomy_id;
-    
-    // Get all properties for this taxonomy
-    const propertiesResponse = await fetch(
-      `https://openapi.etsy.com/v3/application/buyer-taxonomy/nodes/${taxonomyId}/properties`, 
+
+    // 2) Fetch all allowed variation properties for this taxonomy
+    const propertiesResponse = await axios.get(
+      `https://openapi.etsy.com/v3/application/buyer-taxonomy/nodes/${taxonomyId}/properties`,
       {
         headers: {
-          'Authorization': `Bearer ${req.app.get('accessToken')}`,
-          'x-api-key': process.env.ETSY_API_KEY
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': ETSY_API_KEY
         }
       }
     );
-    
-    const propertiesData = await propertiesResponse.json();
-    
-    // Find Size and Print Type properties
+
+    const propertiesData = propertiesResponse.data;
+
+    // Identify the standardized property IDs
     let sizePropertyId = null;
     let printTypePropertyId = null;
-    
+
     if (propertiesData.properties) {
-      for (const prop of propertiesData.properties) {
-        if (prop.name && prop.name.toLowerCase() === 'size') {
-          sizePropertyId = prop.property_id;
+      for (const p of propertiesData.properties) {
+        if (p.name && p.name.toLowerCase() === 'size') {
+          sizePropertyId = p.property_id;
         }
-        if (prop.name && prop.name.toLowerCase() === 'print type') {
-          printTypePropertyId = prop.property_id;
+        if (p.name && p.name.toLowerCase() === 'print type') {
+          printTypePropertyId = p.property_id;
         }
       }
     }
-    
-    // Also get current inventory to see what properties are actually used
-    const inventoryResponse = await fetch(
-      `https://openapi.etsy.com/v3/application/listings/${listingId}/inventory`, 
+
+    // 3) Get current inventory (this exposes the **real** value_id codes)
+    const inventoryResponse = await axios.get(
+      `https://openapi.etsy.com/v3/application/listings/${listingId}/inventory`,
       {
         headers: {
-          'Authorization': `Bearer ${req.app.get('accessToken')}`,
-          'x-api-key': process.env.ETSY_API_KEY
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': ETSY_API_KEY
         }
       }
     );
-    
-    const inventoryData = await inventoryResponse.json();
-    
+
+    const inventoryData = inventoryResponse.data;
+
     res.json({
+      success: true,
       taxonomyId,
       sizePropertyId,
       printTypePropertyId,
-      allProperties: propertiesData.properties,
-      currentInventory: inventoryData,
-      success: true
+      allowedProperties: propertiesData.properties,
+      currentInventory: inventoryData
     });
+
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ 
-      error: error.message, 
-      success: false 
+    console.error('Error fetching property IDs:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      success: false,
+      error: error.response?.data || error.message
     });
   }
 });
