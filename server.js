@@ -196,18 +196,23 @@ app.post('/update-inventory', async (req, res) => {
 
   try {
     const { listing_id, products } = req.body;
+
+    // ✅ Debugging logs
+    console.log('Incoming body:', JSON.stringify(req.body, null, 2));
+
     if (!listing_id || !Array.isArray(products)) {
       return res.status(400).json({ error: 'listing_id and products[] are required' });
     }
 
+    // Etsy expects listing_id in URL, NOT in body
     const payload = {
       products,
-      price_on_property: [513], // Price varies by Frame (property_id 513)
-      quantity_on_property: [], // Quantity doesn't vary
-      sku_on_property: []       // SKU doesn't vary (all use same file_id)
+      price_on_property: [513],
+      quantity_on_property: [],
+      sku_on_property: []
     };
 
-    console.log('Updating inventory for listing:', listing_id);
+    console.log('Sending inventory update to Etsy for listing:', listing_id);
     console.log('Payload:', JSON.stringify(payload, null, 2));
 
     const r = await axios.put(
@@ -221,6 +226,16 @@ app.post('/update-inventory', async (req, res) => {
         }
       }
     );
+
+    res.json({ success: true, inventory: r.data });
+  } catch (error) {
+    console.error('Inventory update error:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
+
 
     res.json({ success: true, inventory: r.data });
   } catch (error) {
