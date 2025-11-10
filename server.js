@@ -229,57 +229,82 @@ app.post('/update-inventory', async (req, res) => {
   }
 });
 
-// Add this to your routes/index.js file or wherever you define routes
-
+// Replace your existing get-size-property-id route with this enhanced version
 app.get('/get-size-property-id/:listingId', async (req, res) => {
   try {
     const { listingId } = req.params;
     
-    // Use your existing access token setup
-    const accessToken = req.app.get('accessToken');
-    
-    const response = await fetch(
-      `https://openapi.etsy.com/v3/application/listings/${listingId}/inventory`, 
+    // First, get the listing to find its taxonomy_id
+    const listingResponse = await fetch(
+      `https://openapi.etsy.com/v3/application/listings/${listingId}`, 
       {
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${req.app.get('accessToken')}`,
           'x-api-key': process.env.ETSY_API_KEY
         }
       }
     );
     
-    const data = await response.json();
+    const listingData = await listingResponse.json();
+    const taxonomyId = listingData.taxonomy_id;
     
-   // Get property IDs from previous node
-const SIZE_PROPERTY_ID = $('Get Variation Properties').item.json.sizePropertyId;
-const PRINT_TYPE_PROPERTY_ID = $('Get Variation Properties').item.json.printTypePropertyId;
-
-// Build variations
-const products = [];
-for (const size of sizes) {
-  for (const printType of printTypes) {
-    // Your pricing logic here
+    // Get all properties for this taxonomy
+    const propertiesResponse = await fetch(
+      `https://openapi.etsy.com/v3/application/buyer-taxonomy/nodes/${taxonomyId}/properties`, 
+      {
+        headers: {
+          'Authorization': `Bearer ${req.app.get('accessToken')}`,
+          'x-api-key': process.env.ETSY_API_KEY
+        }
+      }
+    );
     
-    products.push({
-      sku: fileId,
-      property_values: [
-        { property_id: SIZE_PROPERTY_ID, property_name: "Size", values: [size] },
-        { property_id: PRINT_TYPE_PROPERTY_ID, property_name: "Print Type", values: [printType] }
-      ],
-      offerings: [
-        { price: finalPrice, quantity: 999, is_enabled: true, readiness_state_id: READINESS_STATE_ID }
-      ]
+    const propertiesData = await propertiesResponse.json();
+    
+    // Find Size and Print Type properties
+    let sizePropertyId = null;
+    let printTypePropertyId = null;
+    
+    if (propertiesData.properties) {
+      for (const prop of propertiesData.properties) {
+        if (prop.name && prop.name.toLowerCase() === 'size') {
+          sizePropertyId = prop.property_id;
+        }
+        if (prop.name && prop.name.toLowerCase() === 'print type') {
+          printTypePropertyId = prop.property_id;
+        }
+      }
+    }
+    
+    // Also get current inventory to see what properties are actually used
+    const inventoryResponse = await fetch(
+      `https://openapi.etsy.com/v3/application/listings/${listingId}/inventory`, 
+      {
+        headers: {
+          'Authorization': `Bearer ${req.app.get('accessToken')}`,
+          'x-api-key': process.env.ETSY_API_KEY
+        }
+      }
+    );
+    
+    const inventoryData = await inventoryResponse.json();
+    
+    res.json({
+      taxonomyId,
+      sizePropertyId,
+      printTypePropertyId,
+      allProperties: propertiesData.properties,
+      currentInventory: inventoryData,
+      success: true
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ 
+      error: error.message, 
+      success: false 
     });
   }
-}
-
-return {
-  listing_id: listingId,
-  products: products,
-  price_on_property: [SIZE_PROPERTY_ID, PRINT_TYPE_PROPERTY_ID],
-  quantity_on_property: [],
-  sku_on_property: []
-};
+});
     
 // Health check
 app.get('/', (req, res) => {
