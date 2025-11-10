@@ -195,9 +195,13 @@ app.post('/update-inventory', async (req, res) => {
 
     const payload = {
       products,
-      price_on_property: false, // you’re sending price in offerings
-      sku_on_property: false    // you’re sending sku on product
+      price_on_property: [513], // Price varies by Frame (property_id 513)
+      quantity_on_property: [], // Quantity doesn't vary
+      sku_on_property: []       // SKU doesn't vary (all use same file_id)
     };
+
+    console.log('Updating inventory for listing:', listing_id);
+    console.log('Payload:', JSON.stringify(payload, null, 2));
 
     const r = await axios.put(
       `https://openapi.etsy.com/v3/application/listings/${listing_id}/inventory`,
@@ -211,7 +215,7 @@ app.post('/update-inventory', async (req, res) => {
       }
     );
 
-    res.json(r.data);
+    res.json({ success: true, inventory: r.data });
   } catch (error) {
     console.error('Inventory update error:', error.response?.data || error.message);
     res.status(error.response?.status || 500).json({ error: error.response?.data || error.message });
