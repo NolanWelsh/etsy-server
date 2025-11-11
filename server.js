@@ -225,6 +225,10 @@ app.post('/update-inventory', async (req, res) => {
   }
 });
 
+import multer from 'multer';
+const upload = multer({ storage: multer.memoryStorage() });
+
+
 // Upload a listing image
 app.post('/upload-image', upload.single('image'), async (req, res) => {
   try {
