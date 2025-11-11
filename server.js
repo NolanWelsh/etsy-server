@@ -181,53 +181,47 @@ app.get('/get-listing/:listing_id', async (req, res) => {
   }
 });
 
-    // Update inventory for a listing (n8n -> this route -> Etsy)
+   // Update inventory for a listing (n8n -> this route -> Etsy)
 app.post('/update-inventory', async (req, res) => {
-  if (!accessToken) {
-    return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
-  }
+  if (!accessToken) return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
 
   try {
-    const { listing_id, products } = req.body;
+    // Expect these from n8n
+    const {
+      listing_id,
+      products,
+      price_on_property,
+      quantity_on_property,
+      sku_on_property
+    } = req.body;
 
-    // ✅ Debugging logs
     console.log('Incoming body:', JSON.stringify(req.body, null, 2));
 
     if (!listing_id || !Array.isArray(products)) {
       return res.status(400).json({ error: 'listing_id and products[] are required' });
     }
 
-    const { listing_id, products, price_on_property, quantity_on_property, sku_on_property } = req.body;
-
-const payload = {
-  products,
-  price_on_property: price_on_property ?? [513, 514], // now supports both Size + Frame pricing
-  quantity_on_property: quantity_on_property ?? [],
-  sku_on_property: sku_on_property ?? []
-};
+    // Do NOT force [513]; pass through exactly what n8n sends
+    const payload = {
+      products,
+      price_on_property: price_on_property ?? [513, 514],
+      quantity_on_property: quantity_on_property ?? [],
+      sku_on_property: sku_on_property ?? []
+    };
 
     console.log('Sending inventory update to Etsy for listing:', listing_id);
     console.log('Payload:', JSON.stringify(payload, null, 2));
 
-    // ✅ Correct Etsy API request
     const r = await axios.put(
       `https://openapi.etsy.com/v3/application/listings/${listing_id}/inventory`,
       payload,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'x-api-key': ETSY_API_KEY,
-          'Content-Type': 'application/json',
-        }
-      }
+      { headers: { Authorization: `Bearer ${accessToken}`, 'x-api-key': ETSY_API_KEY, 'Content-Type': 'application/json' } }
     );
 
     res.json({ success: true, inventory: r.data });
   } catch (error) {
     console.error('Inventory update error:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      error: error.response?.data || error.message
-    });
+    res.status(error.response?.status || 500).json({ error: error.response?.data || error.message });
   }
 });
 
