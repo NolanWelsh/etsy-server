@@ -197,12 +197,14 @@ app.post('/update-inventory', async (req, res) => {
       return res.status(400).json({ error: 'listing_id and products[] are required' });
     }
 
-    const payload = {
-      products,
-      price_on_property: [513], // Price varies by Frame (property_id 513)
-      quantity_on_property: [],
-      sku_on_property: []
-    };
+    const { listing_id, products, price_on_property, quantity_on_property, sku_on_property } = req.body;
+
+const payload = {
+  products,
+  price_on_property: price_on_property ?? [513, 514], // now supports both Size + Frame pricing
+  quantity_on_property: quantity_on_property ?? [],
+  sku_on_property: sku_on_property ?? []
+};
 
     console.log('Sending inventory update to Etsy for listing:', listing_id);
     console.log('Payload:', JSON.stringify(payload, null, 2));
