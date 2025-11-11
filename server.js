@@ -225,6 +225,47 @@ app.post('/update-inventory', async (req, res) => {
   }
 });
 
+// Upload a listing image
+app.post('/upload-image', upload.single('image'), async (req, res) => {
+  try {
+    const { listing_id, alt_text } = req.body;
+    if (!listing_id || !req.file) return res.status(400).json({ error: 'listing_id and image required' });
+
+    const form = new FormData();
+    form.append('image', req.file.buffer, req.file.originalname); // multer memory storage
+    if (alt_text) form.append('alt_text', alt_text); // optional
+
+    const r = await axios.post(
+      `https://openapi.etsy.com/v3/application/listings/${listing_id}/images`,
+      form,
+      { headers: { ...form.getHeaders(), Authorization: `Bearer ${accessToken}`, 'x-api-key': ETSY_API_KEY } }
+    );
+    res.json({ success: true, image: r.data });
+  } catch (e) {
+    res.status(e.response?.status || 500).json({ error: e.response?.data || e.message });
+  }
+});
+
+// Upload a listing video
+app.post('/upload-video', upload.single('video'), async (req, res) => {
+  try {
+    const { listing_id } = req.body;
+    if (!listing_id || !req.file) return res.status(400).json({ error: 'listing_id and video required' });
+
+    const form = new FormData();
+    form.append('video', req.file.buffer, req.file.originalname);
+
+    const r = await axios.post(
+      `https://openapi.etsy.com/v3/application/listings/${listing_id}/videos`,
+      form,
+      { headers: { ...form.getHeaders(), Authorization: `Bearer ${accessToken}`, 'x-api-key': ETSY_API_KEY } }
+    );
+    res.json({ success: true, video: r.data });
+  } catch (e) {
+    res.status(e.response?.status || 500).json({ error: e.response?.data || e.message });
+  }
+});
+
 // Get Size + Print Type property IDs and current inventory state
 app.get('/get-size-property-id/:listingId', async (req, res) => {
   try {
