@@ -226,18 +226,21 @@ app.post('/update-inventory', async (req, res) => {
 });
 
 import multer from 'multer';
+import FormData from 'form-data';   // <-- add this
+
 const upload = multer({ storage: multer.memoryStorage() });
 
+// helper to read fields from body OR query (n8n can’t send form fields with n8n-binary)
+const fields = (req) => ({ ...req.query, ...req.body });
 
-// Upload a listing image
 app.post('/upload-image', upload.single('image'), async (req, res) => {
   try {
-    const { listing_id, alt_text } = req.body;
+    const { listing_id, alt_text } = fields(req);   // <-- body or query
     if (!listing_id || !req.file) return res.status(400).json({ error: 'listing_id and image required' });
 
     const form = new FormData();
-    form.append('image', req.file.buffer, req.file.originalname); // multer memory storage
-    if (alt_text) form.append('alt_text', alt_text); // optional
+    form.append('image', req.file.buffer, { filename: req.file.originalname, contentType: req.file.mimetype });
+    if (alt_text) form.append('alt_text', alt_text);
 
     const r = await axios.post(
       `https://openapi.etsy.com/v3/application/listings/${listing_id}/images`,
@@ -250,14 +253,13 @@ app.post('/upload-image', upload.single('image'), async (req, res) => {
   }
 });
 
-// Upload a listing video
 app.post('/upload-video', upload.single('video'), async (req, res) => {
   try {
-    const { listing_id } = req.body;
+    const { listing_id } = fields(req);
     if (!listing_id || !req.file) return res.status(400).json({ error: 'listing_id and video required' });
 
     const form = new FormData();
-    form.append('video', req.file.buffer, req.file.originalname);
+    form.append('video', req.file.buffer, { filename: req.file.originalname, contentType: req.file.mimetype });
 
     const r = await axios.post(
       `https://openapi.etsy.com/v3/application/listings/${listing_id}/videos`,
