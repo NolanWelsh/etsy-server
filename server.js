@@ -3,7 +3,10 @@ const axios = require('axios');
 const crypto = require('crypto');
 const FormData = require('form-data');
 const multer = require('multer');
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 40 * 1024 * 1024 } // 40MB limit
+});
 const app = express();
 app.use(express.json({ limit: '40mb' }));
 app.use(express.urlencoded({ extended: true, limit: '40mb' }));
@@ -12,6 +15,7 @@ const PORT = process.env.PORT || 3000;
 const ETSY_API_KEY = process.env.ETSY_API_KEY;
 const ETSY_API_SECRET = process.env.ETSY_API_SECRET;
 const CALLBACK_URL = process.env.CALLBACK_URL;
+const SHOP_ID = 56086091; // Your shop ID
 
 // Generate consistent code verifier and challenge
 const CODE_VERIFIER = 'DSWlW2WxJHikSi5pfaNAie-tna7S78XX2eDQxm1yypQ';
@@ -20,23 +24,6 @@ const CODE_CHALLENGE = crypto.createHash('sha256').update(CODE_VERIFIER).digest(
 
 let accessToken = null;
 let refreshToken = null;
-
-async function downloadImage(url) {
-  // If it's a Google Drive link, add confirmation bypass
-  if (url.includes('drive.google.com')) {
-    url = url.replace('/uc?id=', '/uc?export=download&confirm=1&id=');
-  }
-  
-  const response = await axios.get(url, { 
-    responseType: 'arraybuffer',
-    maxRedirects: 5,
-    headers: {
-      'User-Agent': 'Mozilla/5.0'
-    }
-  });
-  return Buffer.from(response.data);
-}
-}
 
 // Start OAuth flow
 app.get('/auth', (req, res) => {
@@ -248,80 +235,140 @@ app.post('/update-inventory', async (req, res) => {
   }
 });
 
+// ============================================
+// UPDATED: Upload image to listing
+// ============================================
 app.post('/upload-image', upload.single('image'), async (req, res) => {
   if (!accessToken) {
     return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
   }
 
   try {
+    // Get listing_id from body or query
     const listing_id = req.body.listing_id || req.query.listing_id;
+    const rank = req.body.rank || req.query.rank; // Optional rank parameter
     
-    if (!listing_id || !req.file) {
-      return res.status(400).json({ error: 'listing_id and image file required' });
+    console.log('📸 Upload image request received');
+    console.log('Listing ID:', listing_id);
+    console.log('File received:', req.file ? req.file.originalname : 'NO FILE');
+    console.log('File size:', req.file ? req.file.size : 'N/A');
+    console.log('Rank:', rank || 'not specified');
+    
+    if (!listing_id) {
+      return res.status(400).json({ error: 'listing_id is required' });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file uploaded' });
     }
 
+    // Create FormData for Etsy API
     const form = new FormData();
     form.append('image', req.file.buffer, { 
-      filename: req.file.originalname, 
-      contentType: req.file.mimetype 
+      filename: req.file.originalname || 'mockup.jpg',
+      contentType: req.file.mimetype || 'image/jpeg'
     });
+    
+    // Add rank if provided
+    if (rank) {
+      form.append('rank', rank);
+    }
 
-    const r = await axios.post(
-      `https://openapi.etsy.com/v3/application/listings/${listing_id}/images`,
+    console.log('📤 Sending to Etsy API...');
+    
+    // CRITICAL: Use shop_id in the URL for Etsy API v3
+    const response = await axios.post(
+      `https://openapi.etsy.com/v3/application/shops/${SHOP_ID}/listings/${listing_id}/images`,
       form,
       { 
         headers: { 
-          ...form.getHeaders(), 
-          Authorization: `Bearer ${accessToken}`, 
+          ...form.getHeaders(), // CRITICAL: Let form-data set Content-Type with boundary
+          'Authorization': `Bearer ${accessToken}`, 
           'x-api-key': ETSY_API_KEY 
-        } 
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
       }
     );
     
-    res.json({ success: true, image: r.data });
-  } catch (e) {
-    console.error('Image upload error:', e.message);
-    res.status(e.response?.status || 500).json({ error: e.message });
+    console.log('✅ Image uploaded successfully!');
+    console.log('Image ID:', response.data.listing_image_id);
+    
+    res.json({ 
+      success: true, 
+      message: 'Image uploaded successfully',
+      image: response.data 
+    });
+  } catch (error) {
+    console.error('❌ Image upload error:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ 
+      error: error.response?.data || error.message 
+    });
   }
 });
 
-// Upload a listing video
+// ============================================
+// UPDATED: Upload video to listing
+// ============================================
 app.post('/upload-video', upload.single('video'), async (req, res) => {
   if (!accessToken) {
     return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
   }
 
   try {
-    const { listing_id } = fields(req);
-    if (!listing_id || !req.file) {
-      return res.status(400).json({ error: 'listing_id and video required' });
+    // Get listing_id from body or query
+    const listing_id = req.body.listing_id || req.query.listing_id;
+    
+    console.log('🎥 Upload video request received');
+    console.log('Listing ID:', listing_id);
+    console.log('File received:', req.file ? req.file.originalname : 'NO FILE');
+    console.log('File size:', req.file ? req.file.size : 'N/A');
+    
+    if (!listing_id) {
+      return res.status(400).json({ error: 'listing_id is required' });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No video file uploaded' });
     }
 
-    const imageUrl = req.query.image_url || req.body.image_url;
-const imageBuffer = await downloadImage(imageUrl);
+    // Create FormData for Etsy API
+    const form = new FormData();
+    form.append('video', req.file.buffer, { 
+      filename: req.file.originalname || 'video.mp4',
+      contentType: req.file.mimetype || 'video/mp4'
+    });
 
-const form = new FormData();
-form.append('image', imageBuffer, { 
-  filename: 'mockup.jpg', 
-  contentType: 'image/jpeg' 
-});
-
-    const r = await axios.post(
-      `https://openapi.etsy.com/v3/application/listings/${listing_id}/videos`,
+    console.log('📤 Sending video to Etsy API...');
+    
+    // Use shop_id in the URL for Etsy API v3
+    const response = await axios.post(
+      `https://openapi.etsy.com/v3/application/shops/${SHOP_ID}/listings/${listing_id}/videos`,
       form,
       { 
         headers: { 
-          ...form.getHeaders(), 
-          Authorization: `Bearer ${accessToken}`, 
+          ...form.getHeaders(), // CRITICAL: Let form-data set Content-Type with boundary
+          'Authorization': `Bearer ${accessToken}`, 
           'x-api-key': ETSY_API_KEY 
-        } 
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
       }
     );
     
-    res.json({ success: true, video: r.data });
-  } catch (e) {
-    console.error('Video upload error:', e.response?.data || e.message);
-    res.status(e.response?.status || 500).json({ error: e.response?.data || e.message });
+    console.log('✅ Video uploaded successfully!');
+    console.log('Video ID:', response.data.video_id);
+    
+    res.json({ 
+      success: true, 
+      message: 'Video uploaded successfully',
+      video: response.data 
+    });
+  } catch (error) {
+    console.error('❌ Video upload error:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ 
+      error: error.response?.data || error.message 
+    });
   }
 });
 
