@@ -241,7 +241,8 @@ app.post('/upload-image', upload.single('image'), async (req, res) => {
   }
 
   try {
-    const { listing_id, alt_text } = fields(req);
+    const listing_id = req.query.listing_id || req.body.listing_id;
+const alt_text = req.query.alt_text || req.body.alt_text;
     if (!listing_id || !req.file) {
       return res.status(400).json({ error: 'listing_id and image required' });
     }
