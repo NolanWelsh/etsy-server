@@ -21,10 +21,21 @@ const CODE_CHALLENGE = crypto.createHash('sha256').update(CODE_VERIFIER).digest(
 let accessToken = null;
 let refreshToken = null;
 
-// Helper to download image from URL
 async function downloadImage(url) {
-  const response = await axios.get(url, { responseType: 'arraybuffer' });
+  // If it's a Google Drive link, add confirmation bypass
+  if (url.includes('drive.google.com')) {
+    url = url.replace('/uc?id=', '/uc?export=download&confirm=1&id=');
+  }
+  
+  const response = await axios.get(url, { 
+    responseType: 'arraybuffer',
+    maxRedirects: 5,
+    headers: {
+      'User-Agent': 'Mozilla/5.0'
+    }
+  });
   return Buffer.from(response.data);
+}
 }
 
 // Start OAuth flow
