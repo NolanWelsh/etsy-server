@@ -288,46 +288,33 @@ app.post('/upload-image', upload.any(), async (req, res) => {  // Changed: .sing
 });
 
 // ============================================
-// UPDATED: Upload video to listing
-// ============================================
-app.post('/upload-video', upload.single('video'), async (req, res) => {
+app.post('/upload-video', upload.any(), async (req, res) => {
   if (!accessToken) {
     return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
   }
 
   try {
-    // Get listing_id from body or query
     const listing_id = req.body.listing_id || req.query.listing_id;
+    const name = req.body.name || req.query.name || 'Product Video'; // Add name parameter
+    const file = req.files?.[0];
     
-    console.log('🎥 Upload video request received');
-    console.log('Listing ID:', listing_id);
-    console.log('File received:', req.file ? req.file.originalname : 'NO FILE');
-    console.log('File size:', req.file ? req.file.size : 'N/A');
-    
-    if (!listing_id) {
-      return res.status(400).json({ error: 'listing_id is required' });
-    }
-    
-    if (!req.file) {
-      return res.status(400).json({ error: 'No video file uploaded' });
+    if (!listing_id || !file) {
+      return res.status(400).json({ error: 'listing_id and video file required' });
     }
 
-    // Create FormData for Etsy API
     const form = new FormData();
-    form.append('video', req.file.buffer, { 
-      filename: req.file.originalname || 'video.mp4',
-      contentType: req.file.mimetype || 'video/mp4'
+    form.append('video', file.buffer, { 
+      filename: file.originalname || 'video.mp4',
+      contentType: file.mimetype || 'video/mp4'
     });
-
-    console.log('📤 Sending video to Etsy API...');
+    form.append('name', name); // Add this line
     
-    // Use shop_id in the URL for Etsy API v3
     const response = await axios.post(
       `https://openapi.etsy.com/v3/application/shops/${SHOP_ID}/listings/${listing_id}/videos`,
       form,
       { 
         headers: { 
-          ...form.getHeaders(), // CRITICAL: Let form-data set Content-Type with boundary
+          ...form.getHeaders(),
           'Authorization': `Bearer ${accessToken}`, 
           'x-api-key': ETSY_API_KEY 
         },
@@ -336,16 +323,13 @@ app.post('/upload-video', upload.single('video'), async (req, res) => {
       }
     );
     
-    console.log('✅ Video uploaded successfully!');
-    console.log('Video ID:', response.data.video_id);
-    
     res.json({ 
       success: true, 
       message: 'Video uploaded successfully',
       video: response.data 
     });
   } catch (error) {
-    console.error('❌ Video upload error:', error.response?.data || error.message);
+    console.error('Video upload error:', error.response?.data || error.message);
     res.status(error.response?.status || 500).json({ 
       error: error.response?.data || error.message 
     });
