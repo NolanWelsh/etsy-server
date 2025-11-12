@@ -248,31 +248,23 @@ app.post('/update-inventory', async (req, res) => {
   }
 });
 
-// Helper to read fields from body OR query
-const fields = (req) => ({ ...req.query, ...req.body });
-
-app.post('/upload-image', async (req, res) => {
+app.post('/upload-image', upload.single('image'), async (req, res) => {
   if (!accessToken) {
     return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
   }
 
   try {
-    const listing_id = req.query.listing_id || req.body.listing_id;
-    const image_url = req.query.image_url || req.body.image_url;
-    const alt_text = req.query.alt_text || req.body.alt_text;
+    const listing_id = req.body.listing_id || req.query.listing_id;
     
-    if (!listing_id || !image_url) {
-      return res.status(400).json({ error: 'listing_id and image_url required' });
+    if (!listing_id || !req.file) {
+      return res.status(400).json({ error: 'listing_id and image file required' });
     }
 
-    const imageBuffer = await downloadImage(image_url);
-
     const form = new FormData();
-    form.append('image', imageBuffer, { 
-      filename: 'mockup.jpg', 
-      contentType: 'image/jpeg' 
+    form.append('image', req.file.buffer, { 
+      filename: req.file.originalname, 
+      contentType: req.file.mimetype 
     });
-    if (alt_text) form.append('alt_text', alt_text);
 
     const r = await axios.post(
       `https://openapi.etsy.com/v3/application/listings/${listing_id}/images`,
@@ -288,8 +280,8 @@ app.post('/upload-image', async (req, res) => {
     
     res.json({ success: true, image: r.data });
   } catch (e) {
-    console.error('Image upload error:', e.response?.data || e.message);
-    res.status(e.response?.status || 500).json({ error: e.response?.data || e.message });
+    console.error('Image upload error:', e.message);
+    res.status(e.response?.status || 500).json({ error: e.message });
   }
 });
 
