@@ -21,6 +21,12 @@ const CODE_CHALLENGE = crypto.createHash('sha256').update(CODE_VERIFIER).digest(
 let accessToken = null;
 let refreshToken = null;
 
+// Helper to download image from URL
+async function downloadImage(url) {
+  const response = await axios.get(url, { responseType: 'arraybuffer' });
+  return Buffer.from(response.data);
+}
+
 // Start OAuth flow
 app.get('/auth', (req, res) => {
   const authUrl = `https://www.etsy.com/oauth/connect?response_type=code&redirect_uri=${encodeURIComponent(CALLBACK_URL)}&scope=listings_w%20listings_r%20shops_r&client_id=${ETSY_API_KEY}&state=superstate&code_challenge=${CODE_CHALLENGE}&code_challenge_method=S256`;
@@ -285,11 +291,14 @@ app.post('/upload-video', upload.single('video'), async (req, res) => {
       return res.status(400).json({ error: 'listing_id and video required' });
     }
 
-    const form = new FormData();
-    form.append('video', req.file.buffer, { 
-      filename: req.file.originalname, 
-      contentType: req.file.mimetype 
-    });
+    const imageUrl = req.query.image_url || req.body.image_url;
+const imageBuffer = await downloadImage(imageUrl);
+
+const form = new FormData();
+form.append('image', imageBuffer, { 
+  filename: 'mockup.jpg', 
+  contentType: 'image/jpeg' 
+});
 
     const r = await axios.post(
       `https://openapi.etsy.com/v3/application/listings/${listing_id}/videos`,
