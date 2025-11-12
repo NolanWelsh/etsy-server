@@ -8,14 +8,13 @@ const app = express();
 app.use(express.json({ limit: '40mb' }));
 app.use(express.urlencoded({ extended: true, limit: '40mb' }));
 
-
 const PORT = process.env.PORT || 3000;
 const ETSY_API_KEY = process.env.ETSY_API_KEY;
 const ETSY_API_SECRET = process.env.ETSY_API_SECRET;
 const CALLBACK_URL = process.env.CALLBACK_URL;
 
 // Generate consistent code verifier and challenge
-const CODE_VERIFIER = 'DSWlW2WxJHikSi5pfaNAie-tna7S78XX2eDQxm1yypQ'; // Use only ASCII characters
+const CODE_VERIFIER = 'DSWlW2WxJHikSi5pfaNAie-tna7S78XX2eDQxm1yypQ';
 const CODE_CHALLENGE = crypto.createHash('sha256').update(CODE_VERIFIER).digest('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
@@ -69,7 +68,6 @@ app.post('/create-listing', async (req, res) => {
   try {
     const listingData = req.body;
     
-    // Ensure numeric fields are numbers, not strings
     const cleanData = {
       ...listingData,
       shop_id: parseInt(listingData.shop_id),
@@ -80,7 +78,6 @@ app.post('/create-listing', async (req, res) => {
       processing_max: parseInt(listingData.processing_max)
     };
     
-    // Only process production_partner_ids if it exists
     if (listingData.production_partner_ids) {
       cleanData.production_partner_ids = listingData.production_partner_ids.map(id => parseInt(id));
     }
@@ -186,12 +183,11 @@ app.get('/get-listing/:listing_id', async (req, res) => {
   }
 });
 
-   // Update inventory for a listing (n8n -> this route -> Etsy)
+// Update inventory for a listing
 app.post('/update-inventory', async (req, res) => {
   if (!accessToken) return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
 
   try {
-    // Expect these from n8n
     const {
       listing_id,
       products,
@@ -206,7 +202,6 @@ app.post('/update-inventory', async (req, res) => {
       return res.status(400).json({ error: 'listing_id and products[] are required' });
     }
 
-    // Do NOT force [513]; pass through exactly what n8n sends
     const payload = {
       products,
       price_on_property: price_on_property ?? [513, 514],
@@ -220,7 +215,13 @@ app.post('/update-inventory', async (req, res) => {
     const r = await axios.put(
       `https://openapi.etsy.com/v3/application/listings/${listing_id}/inventory`,
       payload,
-      { headers: { Authorization: `Bearer ${accessToken}`, 'x-api-key': ETSY_API_KEY, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 
+          Authorization: `Bearer ${accessToken}`, 
+          'x-api-key': ETSY_API_KEY, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     );
 
     res.json({ success: true, inventory: r.data });
@@ -230,65 +231,93 @@ app.post('/update-inventory', async (req, res) => {
   }
 });
 
-import multer from 'multer';
-import FormData from 'form-data';   // <-- add this
-
-const upload = multer({ storage: multer.memoryStorage() });
-
-// helper to read fields from body OR query (n8n can’t send form fields with n8n-binary)
+// Helper to read fields from body OR query
 const fields = (req) => ({ ...req.query, ...req.body });
 
 // Upload a listing image
-app.post('/upload-image', upload.single('image'), async (req, res) => { ... });
+app.post('/upload-image', upload.single('image'), async (req, res) => {
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
+  }
+
   try {
-    const { listing_id, alt_text } = fields(req);   // <-- body or query
-    if (!listing_id || !req.file) return res.status(400).json({ error: 'listing_id and image required' });
+    const { listing_id, alt_text } = fields(req);
+    if (!listing_id || !req.file) {
+      return res.status(400).json({ error: 'listing_id and image required' });
+    }
 
     const form = new FormData();
-    form.append('image', req.file.buffer, { filename: req.file.originalname, contentType: req.file.mimetype });
+    form.append('image', req.file.buffer, { 
+      filename: req.file.originalname, 
+      contentType: req.file.mimetype 
+    });
     if (alt_text) form.append('alt_text', alt_text);
 
     const r = await axios.post(
       `https://openapi.etsy.com/v3/application/listings/${listing_id}/images`,
       form,
-      { headers: { ...form.getHeaders(), Authorization: `Bearer ${accessToken}`, 'x-api-key': ETSY_API_KEY } }
+      { 
+        headers: { 
+          ...form.getHeaders(), 
+          Authorization: `Bearer ${accessToken}`, 
+          'x-api-key': ETSY_API_KEY 
+        } 
+      }
     );
+    
     res.json({ success: true, image: r.data });
   } catch (e) {
+    console.error('Image upload error:', e.response?.data || e.message);
     res.status(e.response?.status || 500).json({ error: e.response?.data || e.message });
   }
 });
 
 // Upload a listing video
-app.post('/upload-video', upload.single('video'), async (req, res) => { ... });
+app.post('/upload-video', upload.single('video'), async (req, res) => {
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
+  }
+
   try {
     const { listing_id } = fields(req);
-    if (!listing_id || !req.file) return res.status(400).json({ error: 'listing_id and video required' });
+    if (!listing_id || !req.file) {
+      return res.status(400).json({ error: 'listing_id and video required' });
+    }
 
     const form = new FormData();
-    form.append('video', req.file.buffer, { filename: req.file.originalname, contentType: req.file.mimetype });
+    form.append('video', req.file.buffer, { 
+      filename: req.file.originalname, 
+      contentType: req.file.mimetype 
+    });
 
     const r = await axios.post(
       `https://openapi.etsy.com/v3/application/listings/${listing_id}/videos`,
       form,
-      { headers: { ...form.getHeaders(), Authorization: `Bearer ${accessToken}`, 'x-api-key': ETSY_API_KEY } }
+      { 
+        headers: { 
+          ...form.getHeaders(), 
+          Authorization: `Bearer ${accessToken}`, 
+          'x-api-key': ETSY_API_KEY 
+        } 
+      }
     );
+    
     res.json({ success: true, video: r.data });
   } catch (e) {
+    console.error('Video upload error:', e.response?.data || e.message);
     res.status(e.response?.status || 500).json({ error: e.response?.data || e.message });
   }
 });
 
 // Get Size + Print Type property IDs and current inventory state
 app.get('/get-size-property-id/:listingId', async (req, res) => {
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
+  }
+
   try {
     const { listingId } = req.params;
 
-    if (!accessToken) {
-      return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
-    }
-
-    // 1) Get the listing details (so we know taxonomy_id)
     const listingResponse = await axios.get(
       `https://openapi.etsy.com/v3/application/listings/${listingId}`,
       {
@@ -302,7 +331,6 @@ app.get('/get-size-property-id/:listingId', async (req, res) => {
     const listingData = listingResponse.data;
     const taxonomyId = listingData.taxonomy_id;
 
-    // 2) Fetch all allowed variation properties for this taxonomy
     const propertiesResponse = await axios.get(
       `https://openapi.etsy.com/v3/application/buyer-taxonomy/nodes/${taxonomyId}/properties`,
       {
@@ -315,7 +343,6 @@ app.get('/get-size-property-id/:listingId', async (req, res) => {
 
     const propertiesData = propertiesResponse.data;
 
-    // Identify the standardized property IDs
     let sizePropertyId = null;
     let printTypePropertyId = null;
 
@@ -330,7 +357,6 @@ app.get('/get-size-property-id/:listingId', async (req, res) => {
       }
     }
 
-    // 3) Get current inventory (this exposes the **real** value_id codes)
     const inventoryResponse = await axios.get(
       `https://openapi.etsy.com/v3/application/listings/${listingId}/inventory`,
       {
