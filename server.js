@@ -240,23 +240,26 @@ app.post('/update-inventory', async (req, res) => {
 // Helper to read fields from body OR query
 const fields = (req) => ({ ...req.query, ...req.body });
 
-// Upload a listing image
-app.post('/upload-image', upload.single('image'), async (req, res) => {
+app.post('/upload-image', async (req, res) => {
   if (!accessToken) {
     return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
   }
 
   try {
     const listing_id = req.query.listing_id || req.body.listing_id;
-const alt_text = req.query.alt_text || req.body.alt_text;
-    if (!listing_id || !req.file) {
-      return res.status(400).json({ error: 'listing_id and image required' });
+    const image_url = req.query.image_url || req.body.image_url;
+    const alt_text = req.query.alt_text || req.body.alt_text;
+    
+    if (!listing_id || !image_url) {
+      return res.status(400).json({ error: 'listing_id and image_url required' });
     }
 
+    const imageBuffer = await downloadImage(image_url);
+
     const form = new FormData();
-    form.append('image', req.file.buffer, { 
-      filename: req.file.originalname, 
-      contentType: req.file.mimetype 
+    form.append('image', imageBuffer, { 
+      filename: 'mockup.jpg', 
+      contentType: 'image/jpeg' 
     });
     if (alt_text) form.append('alt_text', alt_text);
 
