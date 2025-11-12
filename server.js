@@ -236,53 +236,36 @@ app.post('/update-inventory', async (req, res) => {
 });
 
 // ============================================
-// UPDATED: Upload image to listing
-// ============================================
-app.post('/upload-image', upload.single('image'), async (req, res) => {
+app.post('/upload-image', upload.any(), async (req, res) => {  // Changed: .single('image') to .any()
   if (!accessToken) {
     return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
   }
 
   try {
-    // Get listing_id from body or query
     const listing_id = req.body.listing_id || req.query.listing_id;
-    const rank = req.body.rank || req.query.rank; // Optional rank parameter
+    const rank = req.body.rank || req.query.rank;
+    const file = req.files?.[0];  // Changed: req.file to req.files[0]
     
-    console.log('📸 Upload image request received');
-    console.log('Listing ID:', listing_id);
-    console.log('File received:', req.file ? req.file.originalname : 'NO FILE');
-    console.log('File size:', req.file ? req.file.size : 'N/A');
-    console.log('Rank:', rank || 'not specified');
-    
-    if (!listing_id) {
-      return res.status(400).json({ error: 'listing_id is required' });
-    }
-    
-    if (!req.file) {
-      return res.status(400).json({ error: 'No image file uploaded' });
+    if (!listing_id || !file) {  // Changed: req.file to file
+      return res.status(400).json({ error: 'listing_id and image file required' });
     }
 
-    // Create FormData for Etsy API
     const form = new FormData();
-    form.append('image', req.file.buffer, { 
-      filename: req.file.originalname || 'mockup.jpg',
-      contentType: req.file.mimetype || 'image/jpeg'
+    form.append('image', file.buffer, {  // Changed: req.file to file
+      filename: file.originalname,        // Changed: req.file to file
+      contentType: file.mimetype          // Changed: req.file to file
     });
     
-    // Add rank if provided
     if (rank) {
       form.append('rank', rank);
     }
 
-    console.log('📤 Sending to Etsy API...');
-    
-    // CRITICAL: Use shop_id in the URL for Etsy API v3
     const response = await axios.post(
       `https://openapi.etsy.com/v3/application/shops/${SHOP_ID}/listings/${listing_id}/images`,
       form,
       { 
         headers: { 
-          ...form.getHeaders(), // CRITICAL: Let form-data set Content-Type with boundary
+          ...form.getHeaders(),
           'Authorization': `Bearer ${accessToken}`, 
           'x-api-key': ETSY_API_KEY 
         },
@@ -291,16 +274,13 @@ app.post('/upload-image', upload.single('image'), async (req, res) => {
       }
     );
     
-    console.log('✅ Image uploaded successfully!');
-    console.log('Image ID:', response.data.listing_image_id);
-    
     res.json({ 
       success: true, 
       message: 'Image uploaded successfully',
       image: response.data 
     });
   } catch (error) {
-    console.error('❌ Image upload error:', error.response?.data || error.message);
+    console.error('Image upload error:', error.response?.data || error.message);
     res.status(error.response?.status || 500).json({ 
       error: error.response?.data || error.message 
     });
