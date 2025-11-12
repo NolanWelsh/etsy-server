@@ -1,8 +1,13 @@
 const express = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
+const FormData = require('form-data');
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '40mb' }));
+app.use(express.urlencoded({ extended: true, limit: '40mb' }));
+
 
 const PORT = process.env.PORT || 3000;
 const ETSY_API_KEY = process.env.ETSY_API_KEY;
@@ -233,7 +238,8 @@ const upload = multer({ storage: multer.memoryStorage() });
 // helper to read fields from body OR query (n8n can’t send form fields with n8n-binary)
 const fields = (req) => ({ ...req.query, ...req.body });
 
-app.post('/upload-image', upload.single('image'), async (req, res) => {
+// Upload a listing image
+app.post('/upload-image', upload.single('image'), async (req, res) => { ... });
   try {
     const { listing_id, alt_text } = fields(req);   // <-- body or query
     if (!listing_id || !req.file) return res.status(400).json({ error: 'listing_id and image required' });
@@ -253,7 +259,8 @@ app.post('/upload-image', upload.single('image'), async (req, res) => {
   }
 });
 
-app.post('/upload-video', upload.single('video'), async (req, res) => {
+// Upload a listing video
+app.post('/upload-video', upload.single('video'), async (req, res) => { ... });
   try {
     const { listing_id } = fields(req);
     if (!listing_id || !req.file) return res.status(400).json({ error: 'listing_id and video required' });
