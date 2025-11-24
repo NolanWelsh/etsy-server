@@ -413,6 +413,26 @@ app.get('/get-size-property-id/:listingId', async (req, res) => {
     });
   }
 });
+
+// Get all taxonomy categories (run once to find Wall Hangings ID)
+app.get('/get-taxonomy', async (req, res) => {
+  try {
+    const response = await axios.get(
+      'https://openapi.etsy.com/v3/application/seller-taxonomy/nodes',
+      {
+        headers: {
+          'x-api-key': ETSY_API_KEY
+        }
+      }
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error fetching taxonomy:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
     
 // Health check
 app.get('/', (req, res) => {
