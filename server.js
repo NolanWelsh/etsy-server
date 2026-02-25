@@ -11,6 +11,11 @@ const app = express();
 app.use(express.json({ limit: '40mb' }));
 app.use(express.urlencoded({ extended: true, limit: '40mb' }));
 
+app.use((req, res, next) => {
+  console.log('REQ', req.method, req.path, 'x-api-key?', Boolean(req.headers['x-api-key']));
+  next();
+});
+
 const PORT = process.env.PORT || 3000;
 const ETSY_API_KEY = process.env.ETSY_API_KEY;
 const ETSY_API_SECRET = process.env.ETSY_API_SECRET;
