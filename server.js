@@ -3,10 +3,12 @@ const axios = require('axios');
 const crypto = require('crypto');
 const FormData = require('form-data');
 const multer = require('multer');
+
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 40 * 1024 * 1024 } // 40MB limit
 });
+
 const app = express();
 app.use(express.json({ limit: '40mb' }));
 app.use(express.urlencoded({ extended: true, limit: '40mb' }));
@@ -21,6 +23,9 @@ const ETSY_API_KEY = process.env.ETSY_API_KEY;
 const ETSY_API_SECRET = process.env.ETSY_API_SECRET;
 const CALLBACK_URL = process.env.CALLBACK_URL;
 const SHOP_ID = 56086091; // Your shop ID
+
+// ✅ Etsy now expects x-api-key = "keystring:shared_secret"
+const ETSY_X_API_KEY = `${ETSY_API_KEY}:${ETSY_API_SECRET}`;
 
 // Generate consistent code verifier and challenge
 const CODE_VERIFIER = 'DSWlW2WxJHikSi5pfaNAie-tna7S78XX2eDQxm1yypQ';
@@ -101,7 +106,7 @@ app.post('/create-listing', async (req, res) => {
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'x-api-key': ETSY_API_KEY,
+          'x-api-key': ETSY_X_API_KEY,
           'Content-Type': 'application/json'
         }
       }
@@ -128,7 +133,7 @@ app.get('/get-shipping-profiles', async (req, res) => {
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'x-api-key': ETSY_API_KEY
+          'x-api-key': ETSY_X_API_KEY
         }
       }
     );
@@ -154,7 +159,7 @@ app.get('/get-production-partners', async (req, res) => {
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'x-api-key': ETSY_API_KEY
+          'x-api-key': ETSY_X_API_KEY
         }
       }
     );
@@ -180,7 +185,7 @@ app.get('/get-listing/:listing_id', async (req, res) => {
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'x-api-key': ETSY_API_KEY
+          'x-api-key': ETSY_X_API_KEY
         }
       }
     );
@@ -227,7 +232,7 @@ app.post('/update-inventory', async (req, res) => {
       { 
         headers: { 
           Authorization: `Bearer ${accessToken}`, 
-          'x-api-key': ETSY_API_KEY, 
+          'x-api-key': ETSY_X_API_KEY, 
           'Content-Type': 'application/json' 
         } 
       }
@@ -272,7 +277,7 @@ app.post('/upload-image', upload.any(), async (req, res) => {  // Changed: .sing
         headers: { 
           ...form.getHeaders(),
           'Authorization': `Bearer ${accessToken}`, 
-          'x-api-key': ETSY_API_KEY 
+          'x-api-key': ETSY_X_API_KEY 
         },
         maxContentLength: Infinity,
         maxBodyLength: Infinity
@@ -321,7 +326,7 @@ app.post('/upload-video', upload.any(), async (req, res) => {
         headers: { 
           ...form.getHeaders(),
           'Authorization': `Bearer ${accessToken}`, 
-          'x-api-key': ETSY_API_KEY 
+          'x-api-key': ETSY_X_API_KEY 
         },
         maxContentLength: Infinity,
         maxBodyLength: Infinity
@@ -355,7 +360,7 @@ app.get('/get-size-property-id/:listingId', async (req, res) => {
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'x-api-key': ETSY_API_KEY
+          'x-api-key': ETSY_X_API_KEY
         }
       }
     );
@@ -368,7 +373,7 @@ app.get('/get-size-property-id/:listingId', async (req, res) => {
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'x-api-key': ETSY_API_KEY
+          'x-api-key': ETSY_X_API_KEY
         }
       }
     );
@@ -394,7 +399,7 @@ app.get('/get-size-property-id/:listingId', async (req, res) => {
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'x-api-key': ETSY_API_KEY
+          'x-api-key': ETSY_X_API_KEY
         }
       }
     );
@@ -426,7 +431,7 @@ app.get('/get-taxonomy', async (req, res) => {
       'https://openapi.etsy.com/v3/application/seller-taxonomy/nodes',
       {
         headers: {
-          'x-api-key': ETSY_API_KEY
+          'x-api-key': ETSY_X_API_KEY
         }
       }
     );
