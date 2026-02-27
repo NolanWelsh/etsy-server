@@ -360,16 +360,30 @@ app.post('/update-listing-properties', async (req, res) => {
         error: 'listing_id and properties[] are required',
         example: {
           listing_id: 123,
-          properties: [{ property_id: 200, value_ids: [2] }],
+          properties: [
+            { property_id: 200, value_ids: [2], values: ['Blue'] },
+          ],
         },
       });
     }
 
-    // Basic validation
+    // Validation: Etsy requires BOTH value_ids[] and values[]
     for (const p of properties) {
-      if (!p?.property_id || !Array.isArray(p?.value_ids)) {
+      const hasPid = Number.isFinite(Number(p?.property_id));
+      const hasValueIds = Array.isArray(p?.value_ids) && p.value_ids.length > 0;
+      const hasValues = Array.isArray(p?.values) && p.values.length > 0;
+
+      if (!hasPid || !hasValueIds || !hasValues) {
         return res.status(400).json({
-          error: 'Each property must include property_id and value_ids[]',
+          error: 'Each property must include property_id, value_ids[], and values[] (both arrays required by Etsy).',
+          bad_property: p,
+          example_property: { property_id: 200, value_ids: [2], values: ['Blue'] },
+        });
+      }
+
+      if (p.value_ids.length !== p.values.length) {
+        return res.status(400).json({
+          error: 'value_ids[] and values[] must be the same length for each property.',
           bad_property: p,
         });
       }
@@ -379,15 +393,14 @@ app.post('/update-listing-properties', async (req, res) => {
 
     for (const p of properties) {
       try {
-        // Etsy expects `values`, not `value_ids`
-        // values = [{ value_id: <id> }, ...]
-        const body = {
-          values: p.value_ids.map((value_id) => ({ value_id })),
+        const payload = {
+          value_ids: p.value_ids.map((v) => Number(v)),
+          values: p.values.map((v) => String(v)),
         };
 
         const r = await axios.put(
           `https://openapi.etsy.com/v3/application/shops/${SHOP_ID}/listings/${listing_id}/properties/${p.property_id}`,
-          body,
+          payload,
           {
             headers: {
               Authorization: `Bearer ${accessToken}`,
@@ -398,9 +411,9 @@ app.post('/update-listing-properties', async (req, res) => {
         );
 
         results.push({
-          property_id: p.property_id,
+          property_id: Number(p.property_id),
           ok: true,
-          sent: body,
+          sent: payload,
           etsy: r.data,
         });
       } catch (err) {
@@ -412,8 +425,9 @@ app.post('/update-listing-properties', async (req, res) => {
           message: 'Failed updating a listing property',
           listing_id,
           failed_property: {
-            property_id: p.property_id,
+            property_id: Number(p.property_id),
             value_ids: p.value_ids,
+            values: p.values,
           },
           error: data,
           partial_results: results,
@@ -421,7 +435,7 @@ app.post('/update-listing-properties', async (req, res) => {
       }
     }
 
-    return res.json({
+    res.json({
       success: true,
       listing_id,
       updated_count: results.length,
@@ -429,9 +443,7 @@ app.post('/update-listing-properties', async (req, res) => {
     });
   } catch (error) {
     console.error('update-listing-properties error:', error.response?.data || error.message);
-    return res.status(error.response?.status || 500).json({
-      error: error.response?.data || error.message,
-    });
+    res.status(error.response?.status || 500).json({ error: error.response?.data || error.message });
   }
 });
 
