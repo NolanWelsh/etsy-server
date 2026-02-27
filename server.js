@@ -365,7 +365,7 @@ app.post('/update-listing-properties', async (req, res) => {
       });
     }
 
-    // Optional: basic validation
+    // Basic validation
     for (const p of properties) {
       if (!p?.property_id || !Array.isArray(p?.value_ids)) {
         return res.status(400).json({
@@ -376,11 +376,18 @@ app.post('/update-listing-properties', async (req, res) => {
     }
 
     const results = [];
+
     for (const p of properties) {
       try {
+        // Etsy expects `values`, not `value_ids`
+        // values = [{ value_id: <id> }, ...]
+        const body = {
+          values: p.value_ids.map((value_id) => ({ value_id })),
+        };
+
         const r = await axios.put(
           `https://openapi.etsy.com/v3/application/shops/${SHOP_ID}/listings/${listing_id}/properties/${p.property_id}`,
-          { value_ids: p.value_ids },
+          body,
           {
             headers: {
               Authorization: `Bearer ${accessToken}`,
@@ -393,11 +400,10 @@ app.post('/update-listing-properties', async (req, res) => {
         results.push({
           property_id: p.property_id,
           ok: true,
-          sent: { value_ids: p.value_ids },
+          sent: body,
           etsy: r.data,
         });
       } catch (err) {
-        // Stop immediately (matches your “fail fast” preference)
         const status = err.response?.status || 500;
         const data = err.response?.data || err.message;
 
@@ -415,7 +421,7 @@ app.post('/update-listing-properties', async (req, res) => {
       }
     }
 
-    res.json({
+    return res.json({
       success: true,
       listing_id,
       updated_count: results.length,
@@ -423,7 +429,9 @@ app.post('/update-listing-properties', async (req, res) => {
     });
   } catch (error) {
     console.error('update-listing-properties error:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({ error: error.response?.data || error.message });
+    return res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message,
+    });
   }
 });
 
