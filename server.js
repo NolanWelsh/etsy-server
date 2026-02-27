@@ -346,6 +346,87 @@ app.post('/upload-video', upload.any(), async (req, res) => {
   }
 });
 
+// Update listing taxonomy properties (attributes) in bulk
+app.post('/update-listing-properties', async (req, res) => {
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Not authenticated. Visit /auth first.' });
+  }
+
+  try {
+    const { listing_id, properties } = req.body;
+
+    if (!listing_id || !Array.isArray(properties) || properties.length === 0) {
+      return res.status(400).json({
+        error: 'listing_id and properties[] are required',
+        example: {
+          listing_id: 123,
+          properties: [{ property_id: 200, value_ids: [2] }],
+        },
+      });
+    }
+
+    // Optional: basic validation
+    for (const p of properties) {
+      if (!p?.property_id || !Array.isArray(p?.value_ids)) {
+        return res.status(400).json({
+          error: 'Each property must include property_id and value_ids[]',
+          bad_property: p,
+        });
+      }
+    }
+
+    const results = [];
+    for (const p of properties) {
+      try {
+        const r = await axios.put(
+          `https://openapi.etsy.com/v3/application/shops/${SHOP_ID}/listings/${listing_id}/properties/${p.property_id}`,
+          { value_ids: p.value_ids },
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'x-api-key': ETSY_X_API_KEY,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        results.push({
+          property_id: p.property_id,
+          ok: true,
+          sent: { value_ids: p.value_ids },
+          etsy: r.data,
+        });
+      } catch (err) {
+        // Stop immediately (matches your “fail fast” preference)
+        const status = err.response?.status || 500;
+        const data = err.response?.data || err.message;
+
+        return res.status(status).json({
+          success: false,
+          message: 'Failed updating a listing property',
+          listing_id,
+          failed_property: {
+            property_id: p.property_id,
+            value_ids: p.value_ids,
+          },
+          error: data,
+          partial_results: results,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      listing_id,
+      updated_count: results.length,
+      results,
+    });
+  } catch (error) {
+    console.error('update-listing-properties error:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ error: error.response?.data || error.message });
+  }
+});
+
 // Get Size + Print Type property IDs and current inventory state
 app.get('/get-size-property-id/:listingId', async (req, res) => {
   if (!accessToken) {
